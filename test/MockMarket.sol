@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../src/AgentboxCore.sol";
+import "../src/interfaces/IAgentboxCore.sol";
 import "../src/AgentboxEconomy.sol";
 import "../src/AgentboxResource.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 contract MockMarket is ERC1155Holder {
-    AgentboxCore public core;
+    IAgentboxCore public core;
     AgentboxEconomy public economy;
     AgentboxResource public resource;
 
@@ -23,7 +23,7 @@ contract MockMarket is ERC1155Holder {
     uint256 public nextOrderId;
 
     constructor(address _core, address _economy, address _resource) {
-        core = AgentboxCore(_core);
+        core = IAgentboxCore(_core);
         economy = AgentboxEconomy(_economy);
         resource = AgentboxResource(_resource);
     }

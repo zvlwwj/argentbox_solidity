@@ -8,8 +8,15 @@ import "../src/AgentboxRole.sol";
 import "../src/AgentboxRandomizer.sol";
 import "../src/AgentboxEconomy.sol";
 import "../src/AgentboxResource.sol";
-import "../src/AgentboxCore.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "../src/proxy/AgentboxDiamond.sol";
+import "../src/facets/AdminFacet.sol";
+import "../src/facets/ActionFacet.sol";
+import "../src/facets/GatherCraftFacet.sol";
+import "../src/facets/LearnFacet.sol";
+import "../src/facets/MapFacet.sol";
+import "../src/facets/RoleFacet.sol";
+import "../src/facets/SocialFacet.sol";
+import "../src/interfaces/IAgentboxCore.sol";
 import {VRFCoordinatorV2Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2Mock.sol";
 
 contract AgentboxCoreTest is Test {
@@ -20,7 +27,7 @@ contract AgentboxCoreTest is Test {
     AgentboxRandomizer randomizer;
     AgentboxEconomy economy;
     AgentboxResource resource;
-    AgentboxCore core;
+    IAgentboxCore core;
 
     address player1 = address(0x111);
     uint64 subId;
@@ -51,23 +58,84 @@ contract AgentboxCoreTest is Test {
         // Deploy Resource
         resource = new AgentboxResource();
 
-        // Deploy Core with Proxy
-        AgentboxCore coreImpl = new AgentboxCore();
-        bytes memory initData = abi.encodeWithSelector(
-            AgentboxCore.initialize.selector,
-            address(roleToken),
-            address(config),
-            address(economy),
-            address(randomizer),
-            address(resource)
-        );
-        ERC1967Proxy proxy = new ERC1967Proxy(address(coreImpl), initData);
-        core = AgentboxCore(address(proxy));
+        // Deploy Diamond
+        AgentboxDiamond diamond = new AgentboxDiamond();
+        
+        // Deploy Facets
+        AdminFacet adminFacet = new AdminFacet();
+        ActionFacet actionFacet = new ActionFacet();
+        GatherCraftFacet gatherCraftFacet = new GatherCraftFacet();
+        LearnFacet learnFacet = new LearnFacet();
+        MapFacet mapFacet = new MapFacet();
+        RoleFacet roleFacet = new RoleFacet();
+        SocialFacet socialFacet = new SocialFacet();
 
-        // Set references
+        // Build Diamond Cut
+        AgentboxDiamond.FacetCut[] memory cuts = new AgentboxDiamond.FacetCut[](7);
+        
+        bytes4[] memory adminSelectors = new bytes4[](7);
+        adminSelectors[0] = AdminFacet.initialize.selector;
+        adminSelectors[1] = AdminFacet.withdrawEth.selector;
+        adminSelectors[2] = AdminFacet.setResourcePoint.selector;
+        adminSelectors[3] = AdminFacet.setSkillBlocks.selector;
+        adminSelectors[4] = AdminFacet.setNPC.selector;
+        adminSelectors[5] = AdminFacet.setRecipe.selector;
+        adminSelectors[6] = AdminFacet.setEquipmentConfig.selector;
+        cuts[0] = AgentboxDiamond.FacetCut({facetAddress: address(adminFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: adminSelectors});
+
+        bytes4[] memory actionSelectors = new bytes4[](5);
+        actionSelectors[0] = ActionFacet.move.selector;
+        actionSelectors[1] = ActionFacet.startMove.selector;
+        actionSelectors[2] = ActionFacet.finishMove.selector;
+        actionSelectors[3] = ActionFacet.attack.selector;
+        actionSelectors[4] = IAgentboxCore.processRespawn.selector;
+        cuts[1] = AgentboxDiamond.FacetCut({facetAddress: address(actionFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: actionSelectors});
+
+        bytes4[] memory gatherCraftSelectors = new bytes4[](7);
+        gatherCraftSelectors[0] = GatherCraftFacet.gather.selector;
+        gatherCraftSelectors[1] = GatherCraftFacet.startGather.selector;
+        gatherCraftSelectors[2] = GatherCraftFacet.finishGather.selector;
+        gatherCraftSelectors[3] = GatherCraftFacet.startCrafting.selector;
+        gatherCraftSelectors[4] = GatherCraftFacet.finishCrafting.selector;
+        gatherCraftSelectors[5] = GatherCraftFacet.equip.selector;
+        gatherCraftSelectors[6] = GatherCraftFacet.unequip.selector;
+        cuts[2] = AgentboxDiamond.FacetCut({facetAddress: address(gatherCraftFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: gatherCraftSelectors});
+
+        bytes4[] memory learnSelectors = new bytes4[](4);
+        learnSelectors[0] = LearnFacet.startLearning.selector;
+        learnSelectors[1] = LearnFacet.startLearningFromPlayer.selector;
+        learnSelectors[2] = LearnFacet.finishLearning.selector;
+        learnSelectors[3] = IAgentboxCore.processNPCRefresh.selector;
+        cuts[3] = AgentboxDiamond.FacetCut({facetAddress: address(learnFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: learnSelectors});
+
+        bytes4[] memory mapSelectors = new bytes4[](4);
+        mapSelectors[0] = MapFacet.getEntityPosition.selector;
+        mapSelectors[1] = MapFacet.buyLand.selector;
+        mapSelectors[2] = MapFacet.sellLand.selector;
+        mapSelectors[3] = MapFacet.setLandContract.selector;
+        cuts[4] = AgentboxDiamond.FacetCut({facetAddress: address(mapFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: mapSelectors});
+
+        bytes4[] memory roleSelectors = new bytes4[](2);
+        roleSelectors[0] = RoleFacet.registerCharacter.selector;
+        roleSelectors[1] = IAgentboxCore.processSpawn.selector;
+        cuts[5] = AgentboxDiamond.FacetCut({facetAddress: address(roleFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: roleSelectors});
+
+        bytes4[] memory socialSelectors = new bytes4[](2);
+        socialSelectors[0] = SocialFacet.sendMessage.selector;
+        socialSelectors[1] = SocialFacet.sendGlobalMessage.selector;
+        cuts[6] = AgentboxDiamond.FacetCut({facetAddress: address(socialFacet), action: AgentboxDiamond.FacetCutAction.Add, functionSelectors: socialSelectors});
+
+        // Execute Cut
+        diamond.diamondCut(cuts);
+
+        // Initialize Core via Diamond
+        core = IAgentboxCore(address(diamond));
+        core.initialize(address(roleToken), address(config), address(economy), address(randomizer), address(resource));
+        
+        // Set GameCore references
+        resource.setGameCore(address(core));
         randomizer.setGameCore(address(core));
         economy.setGameCore(address(core));
-        resource.setGameCore(address(core));
     }
 
     function test_RegisterCharacter() public {
@@ -88,7 +156,6 @@ contract AgentboxCoreTest is Test {
         vm.stopPrank();
 
         // Fulfill VRF for spawn
-        // We need to find the requestId. Randomizer should have requestId 1 if it's the first request
         vrfMock.fulfillRandomWords(1, address(randomizer));
 
         (isValid, x, y) = core.getEntityPosition(walletAddr);

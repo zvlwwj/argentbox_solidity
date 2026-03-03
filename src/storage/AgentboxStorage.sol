@@ -107,6 +107,7 @@ library AgentboxStorage {
     }
 
     struct GameState {
+        address owner;
         address roleContract;
         address configContract;
         address economyContract;
@@ -123,7 +124,7 @@ library AgentboxStorage {
         mapping(uint256 => uint256) skillRequiredBlocks;
         mapping(uint256 => EquipmentConfig) equipments;
         uint256 totalRegistered;
-        uint256[36] __gap;
+        uint256[35] __gap;
     }
 
     bytes32 constant GAME_STORAGE_POSITION = keccak256("agentbox.core.storage");
