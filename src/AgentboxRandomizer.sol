@@ -15,7 +15,7 @@ contract AgentboxRandomizer is Ownable, VRFConsumerBaseV2 {
     VRFCoordinatorV2Interface public COORDINATOR;
     uint64 public s_subscriptionId;
     bytes32 public s_keyHash;
-    uint32 public callbackGasLimit = 200000;
+    uint32 public callbackGasLimit = 500000;
     uint16 public requestConfirmations = 3;
 
     address public gameCore;

@@ -13,7 +13,7 @@ contract AgentboxEconomy is ERC20, Ownable, VRFConsumerBaseV2 {
 
     uint64 public s_subscriptionId;
     bytes32 public s_keyHash;
-    uint32 public callbackGasLimit = 100000;
+    uint32 public callbackGasLimit = 500000;
     uint16 public requestConfirmations = 3;
 
     struct UnreliableBalance {
