@@ -71,6 +71,7 @@ library AgentboxStorage {
         GatheringState gathering;
         TeachingState teaching;
         mapping(uint256 => bool) skills;
+        mapping(uint256 => uint256) equippedItems; // slot => equipmentId
     }
 
     struct ResourcePoint {
@@ -95,6 +96,15 @@ library AgentboxStorage {
         uint256 outputEquipmentId;
     }
 
+    struct EquipmentConfig {
+        uint256 slot; // e.g. 1: Weapon, 2: Armor, etc. (0 means not an equipment)
+        int256 speedBonus;
+        int256 attackBonus;
+        int256 defenseBonus;
+        int256 maxHpBonus;
+        int256 rangeBonus;
+    }
+
     struct GameState {
         address roleContract;
         address configContract;
@@ -110,7 +120,8 @@ library AgentboxStorage {
         mapping(uint256 => NPC) npcs;
         mapping(uint256 => Recipe) recipes;
         mapping(uint256 => uint256) skillRequiredBlocks;
-        uint256[38] __gap;
+        mapping(uint256 => EquipmentConfig) equipments;
+        uint256[37] __gap;
     }
 
     bytes32 constant GAME_STORAGE_POSITION = keccak256("agentbox.core.storage");

@@ -517,6 +517,97 @@ contract AgentboxCore is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         role.state = AgentboxStorage.RoleState.Idle;
     }
 
+    function setEquipmentConfig(
+        uint256 equipmentId,
+        uint256 slot,
+        int256 speedBonus,
+        int256 attackBonus,
+        int256 defenseBonus,
+        int256 maxHpBonus,
+        int256 rangeBonus
+    ) external onlyOwner {
+        AgentboxStorage.GameState storage state = AgentboxStorage.getStorage();
+        state.equipments[equipmentId] = AgentboxStorage.EquipmentConfig({
+            slot: slot,
+            speedBonus: speedBonus,
+            attackBonus: attackBonus,
+            defenseBonus: defenseBonus,
+            maxHpBonus: maxHpBonus,
+            rangeBonus: rangeBonus
+        });
+    }
+
+    function equip(address roleWallet, uint256 equipmentId) external onlyRoleController(roleWallet) {
+        AgentboxStorage.GameState storage state = AgentboxStorage.getStorage();
+        AgentboxStorage.RoleData storage role = state.roles[roleWallet];
+        require(role.state == AgentboxStorage.RoleState.Idle, "Role not idle");
+
+        AgentboxStorage.EquipmentConfig storage config = state.equipments[equipmentId];
+        require(config.slot > 0, "Not an equipment");
+
+        // Verify balance
+        require(AgentboxResource(state.resourceContract).balanceOf(roleWallet, equipmentId) > 0, "Do not own equipment");
+
+        uint256 slot = config.slot;
+        uint256 currentEq = role.equippedItems[slot];
+
+        if (currentEq != 0) {
+            _removeEquipmentStats(role, state.equipments[currentEq]);
+            // return currentEq to inventory
+            AgentboxResource(state.resourceContract).mint(roleWallet, currentEq, 1, "");
+        }
+
+        // burn the newly equipped item from inventory
+        AgentboxResource(state.resourceContract).burn(roleWallet, equipmentId, 1);
+        
+        role.equippedItems[slot] = equipmentId;
+        _applyEquipmentStats(role, config);
+    }
+
+    function unequip(address roleWallet, uint256 slot) external onlyRoleController(roleWallet) {
+        AgentboxStorage.GameState storage state = AgentboxStorage.getStorage();
+        AgentboxStorage.RoleData storage role = state.roles[roleWallet];
+        require(role.state == AgentboxStorage.RoleState.Idle, "Role not idle");
+
+        uint256 currentEq = role.equippedItems[slot];
+        require(currentEq != 0, "Nothing equipped in slot");
+
+        role.equippedItems[slot] = 0;
+        _removeEquipmentStats(role, state.equipments[currentEq]);
+
+        // return item to inventory
+        AgentboxResource(state.resourceContract).mint(roleWallet, currentEq, 1, "");
+    }
+
+    function _applyEquipmentStats(AgentboxStorage.RoleData storage role, AgentboxStorage.EquipmentConfig memory config) internal {
+        role.attributes.speed = _addIntToUint(role.attributes.speed, config.speedBonus);
+        role.attributes.attack = _addIntToUint(role.attributes.attack, config.attackBonus);
+        role.attributes.defense = _addIntToUint(role.attributes.defense, config.defenseBonus);
+        role.attributes.maxHp = _addIntToUint(role.attributes.maxHp, config.maxHpBonus);
+        role.attributes.range = _addIntToUint(role.attributes.range, config.rangeBonus);
+    }
+
+    function _removeEquipmentStats(AgentboxStorage.RoleData storage role, AgentboxStorage.EquipmentConfig memory config) internal {
+        role.attributes.speed = _addIntToUint(role.attributes.speed, -config.speedBonus);
+        role.attributes.attack = _addIntToUint(role.attributes.attack, -config.attackBonus);
+        role.attributes.defense = _addIntToUint(role.attributes.defense, -config.defenseBonus);
+        role.attributes.maxHp = _addIntToUint(role.attributes.maxHp, -config.maxHpBonus);
+        role.attributes.range = _addIntToUint(role.attributes.range, -config.rangeBonus);
+
+        if (role.attributes.hp > role.attributes.maxHp) {
+            role.attributes.hp = role.attributes.maxHp;
+        }
+    }
+
+    function _addIntToUint(uint256 a, int256 b) internal pure returns (uint256) {
+        if (b < 0) {
+            uint256 absB = uint256(-b);
+            return a > absB ? a - absB : 0;
+        } else {
+            return a + uint256(b);
+        }
+    }
+
     function buyLand(address roleWallet, uint256 x, uint256 y) external onlyRoleController(roleWallet) {
         AgentboxStorage.GameState storage state = AgentboxStorage.getStorage();
         AgentboxConfig config = AgentboxConfig(state.configContract);
