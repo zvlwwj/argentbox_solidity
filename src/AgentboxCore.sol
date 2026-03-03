@@ -461,16 +461,17 @@ contract AgentboxCore is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function setRecipe(
         uint256 recipeId,
-        uint256 resourceType,
-        uint256 amount,
+        uint256[] calldata resourceTypes,
+        uint256[] calldata amounts,
         uint256 skillId,
         uint256 requiredBlocks,
         uint256 outputEqId
     ) external onlyOwner {
+        require(resourceTypes.length == amounts.length, "Mismatched arrays");
         AgentboxStorage.GameState storage state = AgentboxStorage.getStorage();
         state.recipes[recipeId] = AgentboxStorage.Recipe({
-            requiredResource: resourceType,
-            requiredAmount: amount,
+            requiredResources: resourceTypes,
+            requiredAmounts: amounts,
             requiredSkill: skillId,
             requiredBlocks: requiredBlocks,
             outputEquipmentId: outputEqId
@@ -486,11 +487,13 @@ contract AgentboxCore is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         require(recipe.outputEquipmentId != 0, "Invalid recipe");
         require(role.skills[recipe.requiredSkill], "Missing required skill");
         
-        // Verify balance
-        require(AgentboxResource(state.resourceContract).balanceOf(roleWallet, recipe.requiredResource) >= recipe.requiredAmount, "Not enough resources");
-
-        // Deduct resources
-        AgentboxResource(state.resourceContract).burn(roleWallet, recipe.requiredResource, recipe.requiredAmount);
+        // Verify balances and deduct resources
+        for (uint256 i = 0; i < recipe.requiredResources.length; i++) {
+            uint256 resId = recipe.requiredResources[i];
+            uint256 amt = recipe.requiredAmounts[i];
+            require(AgentboxResource(state.resourceContract).balanceOf(roleWallet, resId) >= amt, "Not enough resources");
+            AgentboxResource(state.resourceContract).burn(roleWallet, resId, amt);
+        }
 
         // Set state
         role.state = AgentboxStorage.RoleState.Crafting;

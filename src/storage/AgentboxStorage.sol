@@ -88,8 +88,8 @@ library AgentboxStorage {
     }
 
     struct Recipe {
-        uint256 requiredResource;
-        uint256 requiredAmount;
+        uint256[] requiredResources;
+        uint256[] requiredAmounts;
         uint256 requiredSkill;
         uint256 requiredBlocks;
         uint256 outputEquipmentId;
