@@ -3,15 +3,16 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import "./AgentboxConfig.sol";
 
-contract AgentboxEconomy is ERC20, Ownable, VRFConsumerBaseV2 {
+contract AgentboxEconomy is ERC20, VRFConsumerBaseV2Plus {
     AgentboxConfig public config;
-    VRFCoordinatorV2Interface public COORDINATOR;
+    IVRFCoordinatorV2Plus public COORDINATOR;
 
-    uint64 public s_subscriptionId;
+    uint256 public s_subscriptionId;
     bytes32 public s_keyHash;
     uint32 public callbackGasLimit = 500000;
     uint16 public requestConfirmations = 3;
@@ -36,13 +37,11 @@ contract AgentboxEconomy is ERC20, Ownable, VRFConsumerBaseV2 {
     event TokensPickedUp(address indexed account, uint256 indexed landId, uint256 amount);
     event TokensStabilized(address indexed account, uint256 amount);
 
-    constructor(address _config, address vrfCoordinator, bytes32 keyHash, uint64 subscriptionId)
+    constructor(address _config, address vrfCoordinator, bytes32 keyHash, uint256 subscriptionId)
         ERC20("AgentboxCoin", "AGC")
-        Ownable(msg.sender)
-        VRFConsumerBaseV2(vrfCoordinator)
+        VRFConsumerBaseV2Plus(vrfCoordinator)
     {
         config = AgentboxConfig(_config);
-        COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
         s_keyHash = keyHash;
         s_subscriptionId = subscriptionId;
         lastMintBlock = block.number;
@@ -61,12 +60,20 @@ contract AgentboxEconomy is ERC20, Ownable, VRFConsumerBaseV2 {
         require(block.number >= lastMintBlock + config.mintIntervalBlocks(), "Too early");
         lastMintBlock = block.number;
 
-        uint256 requestId =
-            COORDINATOR.requestRandomWords(s_keyHash, s_subscriptionId, requestConfirmations, callbackGasLimit, 1);
+        uint256 requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: 1,
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+            })
+        );
         pendingMintRequests[requestId] = true;
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
         if (pendingMintRequests[requestId]) {
             delete pendingMintRequests[requestId];
 

@@ -2,13 +2,14 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import "./interfaces/IAgentboxCore.sol";
 
-contract AgentboxRandomizer is Ownable, VRFConsumerBaseV2 {
-    VRFCoordinatorV2Interface public COORDINATOR;
-    uint64 public s_subscriptionId;
+contract AgentboxRandomizer is VRFConsumerBaseV2Plus {
+    IVRFCoordinatorV2Plus public COORDINATOR;
+    uint256 public s_subscriptionId;
     bytes32 public s_keyHash;
     uint32 public callbackGasLimit = 500000;
     uint16 public requestConfirmations = 3;
@@ -28,11 +29,9 @@ contract AgentboxRandomizer is Ownable, VRFConsumerBaseV2 {
 
     mapping(uint256 => RequestInfo) public requests;
 
-    constructor(address vrfCoordinator, bytes32 keyHash, uint64 subscriptionId)
-        Ownable(msg.sender)
-        VRFConsumerBaseV2(vrfCoordinator)
+    constructor(address vrfCoordinator, bytes32 keyHash, uint256 subscriptionId)
+        VRFConsumerBaseV2Plus(vrfCoordinator)
     {
-        COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
         s_keyHash = keyHash;
         s_subscriptionId = subscriptionId;
     }
@@ -47,24 +46,48 @@ contract AgentboxRandomizer is Ownable, VRFConsumerBaseV2 {
     }
 
     function requestRespawn(uint256 roleId) external onlyCore returns (uint256 requestId) {
-        requestId =
-            COORDINATOR.requestRandomWords(s_keyHash, s_subscriptionId, requestConfirmations, callbackGasLimit, 1);
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: 1,
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+            })
+        );
         requests[requestId] = RequestInfo({reqType: RequestType.Respawn, targetId: roleId});
     }
 
     function requestSpawn(uint256 roleId) external onlyCore returns (uint256 requestId) {
-        requestId =
-            COORDINATOR.requestRandomWords(s_keyHash, s_subscriptionId, requestConfirmations, callbackGasLimit, 1);
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: 1,
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+            })
+        );
         requests[requestId] = RequestInfo({reqType: RequestType.Spawn, targetId: roleId});
     }
 
     function requestNPCRefresh(uint256 npcId) external onlyCore returns (uint256 requestId) {
-        requestId =
-            COORDINATOR.requestRandomWords(s_keyHash, s_subscriptionId, requestConfirmations, callbackGasLimit, 1);
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: 1,
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+            })
+        );
         requests[requestId] = RequestInfo({reqType: RequestType.NPCRefresh, targetId: npcId});
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
         RequestInfo memory req = requests[requestId];
         if (req.reqType == RequestType.Respawn) {
             IAgentboxCore(gameCore).processRespawn(req.targetId, randomWords[0]);

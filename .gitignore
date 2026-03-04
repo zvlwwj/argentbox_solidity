@@ -5,7 +5,9 @@ out/
 # Ignores development environments
 .env
 .DS_Store
-
+DEPLOY.md
+script/
+docs/
 # Forge dependencies
 # We can include lib in .gitignore or keep it depending on whether we want to version control deps.
 # Standard practice is often to track submodules or keep them in .gitmodules, but here lib/ seems to contain raw directories (since git submodules weren't initialized properly or user requested --no-git earlier).
